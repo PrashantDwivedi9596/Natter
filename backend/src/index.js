@@ -5,6 +5,7 @@ import 'dotenv/config'
 import { clerkMiddleware } from '@clerk/express'
 import cors from 'cors'
 import { connectDB } from './lib/db.js' // Import the connectDB function from db.js
+import job from './lib/cron'
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -38,4 +39,7 @@ if (fs.existsSync(publicDir)) {
 app.listen(PORT, () => {
   connectDB() // Call the connectDB function to establish a connection to MongoDB
   console.log(`Server is running on port ${PORT}`)
+  if (process.env.NODE_ENV === 'production') {
+    job.start()
+  }
 })

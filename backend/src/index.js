@@ -5,7 +5,7 @@ import 'dotenv/config'
 import { clerkMiddleware } from '@clerk/express'
 import cors from 'cors'
 import { connectDB } from './lib/db.js' // Import the connectDB function from db.js
-import job from './lib/cron'
+import job from './lib/cron.js'
 
 const app = express()
 const PORT = process.env.PORT || 3000

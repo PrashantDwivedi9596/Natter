@@ -1,30 +1,18 @@
 import express from 'express'
+import { verifyWebhook } from '@clerk/express/webhooks'
 import User from '../models/user.model.js'
-import { verifyWebhook } from '@clerk/backend/webhooks'
 
 const router = express.Router()
 
 router.post('/', async (req, res) => {
+  console.log('========== CLERK WEBHOOK HIT ==========')
+
   try {
-    const SigningSecret = process.env.CLERK_WEBHOOK_SIGNING_SECRET
-    if (!SigningSecret) {
-      res.status(503).json({ message: 'Webhook secret is not provided' })
-      return
-    }
+    console.log('Body is Buffer:', Buffer.isBuffer(req.body))
 
-    //clerk's verifier expects a Web Request with the raw body; express.raw gives a Buffer
-    const payLoad = Buffer.isBuffer(req.body)
-      ? req.body.toString('utf-8')
-      : String(req.body)
+    const evt = await verifyWebhook(req)
 
-    const request = new Request('http://internal/webhooks/clerks', {
-      method: 'POST',
-      headers: new Headers(req.headers),
-      body: payLoad,
-    })
-
-    //throws if the signature is wrong or the body was tampered with; only then do we trust evt.
-    const evt = await verifyWebhook(request, { SigningSecret })
+    console.log('Verified Clerk event:', evt.type)
 
     if (evt.type === 'user.created' || evt.type === 'user.updated') {
       const u = evt.data
@@ -36,24 +24,53 @@ router.post('/', async (req, res) => {
       const fullName =
         [u.first_name, u.last_name].filter(Boolean).join(' ') ||
         u.username ||
-        email?.split('@')[0]
+        email?.split('@')[0] ||
+        'User'
 
-      await User.findOneAndUpdate(
+      const savedUser = await User.findOneAndUpdate(
         { clerkId: u.id },
-        { clerkId: u.id, email, fullName, profilePic: u.image_url },
-        { new: true, upsert: true, setDefaultsOnInsert: true },
+        {
+          $set: {
+            email,
+            fullName,
+            profilePic: u.image_url,
+          },
+          $setOnInsert: {
+            clerkId: u.id,
+          },
+        },
+        {
+          upsert: true,
+          new: true,
+          runValidators: true,
+        },
       )
+
+      console.log('MongoDB user saved:', savedUser._id)
     }
 
     if (evt.type === 'user.deleted') {
-      if (evt.data.id)
-        await User.findOneAndDelete({ clerkId: evt.data.id }, options)
+      if (evt.data.id) {
+        await User.findOneAndDelete({
+          clerkId: evt.data.id,
+        })
+
+        console.log('MongoDB user deleted:', evt.data.id)
+      }
     }
 
-    res.status(200).json({ received: true })
+    return res.status(200).json({
+      success: true,
+      received: true,
+    })
   } catch (err) {
-    console.error('Error in Clerk webhook:', error)
-    res.status(400).json({ message: 'Webhook verification failed' })
+    console.error('CLERK WEBHOOK ERROR:', err)
+
+    return res.status(400).json({
+      success: false,
+      message: err.message,
+    })
   }
 })
+
 export default router

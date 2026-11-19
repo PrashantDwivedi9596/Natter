@@ -47,6 +47,10 @@ app.listen(PORT, () => {
   connectDB() // Call the connectDB function to establish a connection to MongoDB
   console.log(`Server is running on port ${PORT}`)
   if (process.env.NODE_ENV === 'production') {
+    console.log(
+      'Clerk webhook secret configured:',
+      Boolean(process.env.CLERK_WEBHOOK_SIGNING_SECRET),
+    )
     job.start()
   }
 })

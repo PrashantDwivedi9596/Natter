@@ -4,9 +4,11 @@ import path from 'path'
 import 'dotenv/config'
 import { clerkMiddleware } from '@clerk/express'
 import clerkWebHook from './webhooks/clerk.webhook.js'
-import cors from 'cors'
 import { connectDB } from './lib/db.js' // Import the connectDB function from db.js
+import cors from 'cors'
 import job from './lib/cron.js'
+
+import authRoutes from './routes/auth.route.js'
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -19,6 +21,8 @@ app.use(
   express.raw({ type: 'application/json' }),
   clerkWebHook,
 )
+
+app.use('/api/auth', authRoutes)
 
 app.use(express.json()) //allow to parse JSON data in the request body
 app.use(
